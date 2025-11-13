@@ -1,6 +1,6 @@
 module github.com/jcomo/s3-proxy
 
-go 1.25.2
+go 1.21
 
 require (
 	github.com/aws/aws-sdk-go v1.55.8
