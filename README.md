@@ -31,11 +31,57 @@ go build -o s3-proxy
 
 ### Environment Variables
 
-- `AWS_ACCESS_KEY_ID` - S3 access key (required)
-- `AWS_SECRET_ACCESS_KEY` - S3 secret key (required)
-- `AWS_REGION` - S3 region (default: us-east-1)
-- `AWS_BUCKET` - S3 bucket name (required)
-- `AWS_ENDPOINT` - S3 endpoint URL (optional, for Wasabi, MinIO, etc.)
+**Single Mode** (one bucket):
+- `S3PROXY_AWS_KEY` - S3 access key (required)
+- `S3PROXY_AWS_SECRET` - S3 secret key (required)
+- `S3PROXY_AWS_REGION` - S3 region (default: us-east-1)
+- `S3PROXY_AWS_BUCKET` - S3 bucket name (required)
+- `S3PROXY_AWS_ENDPOINT` - S3 endpoint URL (optional, for Wasabi, Backblaze, MinIO, etc.)
+
+**Multi Mode** (multiple buckets/backends):
+- `S3PROXY_CONFIG` - JSON array of configurations (see example below)
+
+### Multiple Buckets / Backends
+
+Configure multiple buckets with different backends (Backblaze, Wasabi, AWS S3, etc.):
+
+```bash
+export S3PROXY_CONFIG='[
+  {
+    "host": "wasabi.localhost",
+    "awsKey": "wasabi-access-key",
+    "awsSecret": "wasabi-secret-key",
+    "awsRegion": "us-east-1",
+    "awsBucket": "my-wasabi-bucket",
+    "awsEndpoint": "https://s3.wasabisys.com"
+  },
+  {
+    "host": "backblaze.localhost",
+    "awsKey": "backblaze-key-id",
+    "awsSecret": "backblaze-application-key",
+    "awsRegion": "us-west-004",
+    "awsBucket": "my-backblaze-bucket",
+    "awsEndpoint": "https://s3.us-west-004.backblazeb2.com"
+  },
+  {
+    "host": "aws.localhost",
+    "awsKey": "aws-access-key",
+    "awsSecret": "aws-secret-key",
+    "awsRegion": "us-east-1",
+    "awsBucket": "my-aws-bucket"
+  }
+]'
+```
+
+**Docker Example:**
+```bash
+docker run -d \
+  -p 8080:8080 \
+  -e S3PROXY_CONFIG='[{"host":"wasabi.localhost","awsKey":"key","awsSecret":"secret","awsRegion":"us-east-1","awsBucket":"bucket","awsEndpoint":"https://s3.wasabisys.com"}]' \
+  stackblaze/s3-proxy:latest
+```
+
+**Note:** Multi-mode routes requests based on the `Host` header. Configure DNS or use `/etc/hosts` to point different hostnames to the proxy.
 
 ### ZeroFS Configuration
 
