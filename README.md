@@ -81,6 +81,44 @@ docker run -d \
   stackblaze/s3-proxy:latest
 ```
 
+### Hot-Reload Configuration (No Restart Required)
+
+Use a config file for real-time configuration updates without restarting:
+
+```bash
+# Create config file
+cat > config.json << 'EOF'
+[
+  {
+    "host": "wasabi.localhost",
+    "awsKey": "wasabi-key",
+    "awsSecret": "wasabi-secret",
+    "awsRegion": "us-east-1",
+    "awsBucket": "my-bucket",
+    "awsEndpoint": "https://s3.wasabisys.com"
+  }
+]
+EOF
+
+# Start with config file (auto-reloads on changes)
+./s3-proxy -config-file config.json -port 8080
+```
+
+**Docker with Config File:**
+```bash
+docker run -d \
+  -p 8080:8080 \
+  -v $(pwd)/config.json:/app/config.json \
+  stackblaze/s3-proxy:latest \
+  -config-file /app/config.json
+```
+
+**How it works:**
+- Edit `config.json` and save
+- Configuration reloads automatically within ~100ms
+- No proxy restart needed
+- Changes take effect immediately
+
 **Note:** Multi-mode routes requests based on the `Host` header. Configure DNS or use `/etc/hosts` to point different hostnames to the proxy.
 
 ### ZeroFS Configuration

@@ -34,15 +34,31 @@ type Options struct {
 }
 
 func main() {
-	handler, err := ConfiguredProxyHandler()
-	if err != nil {
-		fmt.Printf("fatal: %v\n", err)
-		return
-	}
-
+	configFile := flag.String("config-file", "", "Path to JSON config file (enables hot-reload)")
 	port := flag.Int("port", 8080, "Port to listen on")
 
 	flag.Parse()
+
+	var handler http.Handler
+	var err error
+
+	if *configFile != "" {
+		// Use file-based configuration with hot-reload
+		log.Println("Loading configuration from file: " + *configFile)
+		handler, err = NewReloadableHandler(*configFile)
+		if err != nil {
+			fmt.Printf("fatal: %v\n", err)
+			return
+		}
+		log.Println("Hot-reload enabled - configuration will reload automatically on file changes")
+	} else {
+		// Use environment variable configuration (legacy)
+		handler, err = ConfiguredProxyHandler()
+		if err != nil {
+			fmt.Printf("fatal: %v\n", err)
+			return
+		}
+	}
 
 	portStr := strconv.FormatInt(int64(*port), 10)
 
