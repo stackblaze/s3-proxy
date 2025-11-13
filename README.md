@@ -11,7 +11,7 @@ A lightweight S3-compatible proxy optimized for ZeroFS. Proxies S3 requests to b
 ### Install Binary
 
 ```bash
-curl -sSfL https://raw.githubusercontent.com/stackblaze/s3-proxy/main/install.sh | sh
+curl -sSfL https://raw.githubusercontent.com/stackblaze/s3-proxy/main/scripts/install.sh | sh
 ```
 
 Or download manually from [releases](https://github.com/stackblaze/s3-proxy/releases).
