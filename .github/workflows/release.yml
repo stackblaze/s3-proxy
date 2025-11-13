@@ -241,7 +241,8 @@ jobs:
           path: "*.rpm *.deb"
 
   create-release:
-    needs: [build-and-push, build-binaries, build-packages]
+    needs: [build-and-push, build-binaries]
+    if: always() && (needs.build-and-push.result == 'success' || needs.build-and-push.result == 'skipped') && needs.build-binaries.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -259,11 +260,20 @@ jobs:
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Download all artifacts
+      - name: Download binary artifacts
         uses: actions/download-artifact@v4
         with:
-          path: ./artifacts
-          pattern: '*'
+          path: ./artifacts/binaries
+          pattern: 's3-proxy-*'
+          merge-multiple: false
+
+      - name: Download package artifacts (if available)
+        if: always()
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          path: ./artifacts/packages
+          pattern: 's3-proxy-*.rpm s3-proxy-*.deb'
           merge-multiple: false
 
       - name: Create Release
@@ -290,9 +300,11 @@ jobs:
             
             RPM and DEB packages are available in [GitHub Packages](https://github.com/${{ github.repository }}/packages).
           files: |
-            artifacts/**/*
+            artifacts/binaries/**/*
+            artifacts/packages/**/*
           draft: false
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 
