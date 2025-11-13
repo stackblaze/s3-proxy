@@ -1,0 +1,9 @@
+.git
+.gitignore
+vendor
+*.md
+*.sh
+s3-proxy
+.DS_Store
+*.log
+
