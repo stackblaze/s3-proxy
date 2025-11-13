@@ -6,6 +6,7 @@ require (
 	github.com/aws/aws-sdk-go v1.55.8
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/gorilla/handlers v1.5.2
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (

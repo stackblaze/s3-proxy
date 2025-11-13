@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/gorilla/handlers"
+	"gopkg.in/yaml.v3"
 )
 
 type sitesCfg []Site
@@ -43,7 +44,12 @@ func createMulti() (http.Handler, error) {
 	var cfg sitesCfg
 	cfgJson := os.Getenv(kConfigName)
 
-	err := json.Unmarshal([]byte(cfgJson), &cfg)
+	// Try YAML first, fallback to JSON for backward compatibility
+	err := yaml.Unmarshal([]byte(cfgJson), &cfg)
+	if err != nil {
+		// Fallback to JSON parsing
+		err = json.Unmarshal([]byte(cfgJson), &cfg)
+	}
 	if err != nil {
 		return nil, err
 	}

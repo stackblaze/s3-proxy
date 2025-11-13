@@ -1,12 +1,12 @@
 package main
 
 import (
-	"encoding/json"
 	"os"
 	"sync"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+	"gopkg.in/yaml.v3"
 )
 
 type ReloadableHandler struct {
@@ -56,9 +56,9 @@ func (rh *ReloadableHandler) reload() error {
 
 	rh.config.lastMod = info.ModTime()
 
-	// Parse configuration
+	// Parse YAML configuration
 	var cfg sitesCfg
-	if err := json.Unmarshal(data, &cfg); err != nil {
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return err
 	}
 

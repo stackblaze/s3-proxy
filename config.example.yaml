@@ -1,0 +1,14 @@
+- host: wasabi.localhost
+  awsKey: your-wasabi-access-key
+  awsSecret: your-wasabi-secret-key
+  awsRegion: us-east-1
+  awsBucket: my-wasabi-bucket
+  awsEndpoint: https://s3.wasabisys.com
+
+- host: backblaze.localhost
+  awsKey: your-backblaze-key-id
+  awsSecret: your-backblaze-application-key
+  awsRegion: us-west-004
+  awsBucket: my-backblaze-bucket
+  awsEndpoint: https://s3.us-west-004.backblazeb2.com
+

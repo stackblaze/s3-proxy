@@ -34,7 +34,7 @@ type Options struct {
 }
 
 func main() {
-	configFile := flag.String("config-file", "", "Path to JSON config file (enables hot-reload)")
+	configFile := flag.String("config-file", "", "Path to YAML config file (enables hot-reload)")
 	port := flag.Int("port", 8080, "Port to listen on")
 
 	flag.Parse()
