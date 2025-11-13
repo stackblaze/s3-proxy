@@ -33,7 +33,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: read
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -47,6 +46,6 @@ jobs:
           context: .
           push: false
           tags: ghcr.io/stackblaze/s3-proxy:test
-          cache-from: type=registry,ref=ghcr.io/stackblaze/s3-proxy:buildcache
-          cache-to: type=registry,ref=ghcr.io/stackblaze/s3-proxy:buildcache,mode=max
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
