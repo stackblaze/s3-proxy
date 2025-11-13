@@ -100,8 +100,91 @@ jobs:
           name: s3-proxy-${{ matrix.goos }}-${{ matrix.goarch }}
           path: s3-proxy-*
 
+  build-packages:
+    needs: [build-binaries]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        package_type: [rpm, deb]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION=${GITHUB_REF#refs/tags/}
+          fi
+          # Remove 'v' prefix if present
+          VERSION=${VERSION#v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "VERSION=$VERSION"
+
+      - name: Download Linux binary
+        uses: actions/download-artifact@v4
+        with:
+          name: s3-proxy-linux-amd64
+          path: ./binary
+
+      - name: Set up Ruby for fpm
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ruby ruby-dev build-essential rpm
+          sudo gem install fpm -v 1.15.0
+
+      - name: Build ${{ matrix.package_type }} package
+        run: |
+          chmod +x binary/s3-proxy-linux-amd64
+          mkdir -p pkg/usr/local/bin
+          cp binary/s3-proxy-linux-amd64 pkg/usr/local/bin/s3-proxy
+          
+          if [ "${{ matrix.package_type }}" == "rpm" ]; then
+            fpm -s dir -t rpm \
+              -n s3-proxy \
+              -v ${{ steps.version.outputs.version }} \
+              --license MIT \
+              --description "A lightweight S3-compatible proxy optimized for ZeroFS" \
+              --url https://github.com/stackblaze/s3-proxy \
+              --maintainer "Stackblaze <noreply@stackblaze.com>" \
+              -C pkg \
+              usr
+          else
+            fpm -s dir -t deb \
+              -n s3-proxy \
+              -v ${{ steps.version.outputs.version }} \
+              --license MIT \
+              --description "A lightweight S3-compatible proxy optimized for ZeroFS" \
+              --url https://github.com/stackblaze/s3-proxy \
+              --maintainer "Stackblaze <noreply@stackblaze.com>" \
+              -C pkg \
+              usr
+          fi
+
+      - name: Publish ${{ matrix.package_type }} to GitHub Packages
+        run: |
+          PACKAGE_FILE=$(ls *.rpm *.deb 2>/dev/null | head -1)
+          echo "PACKAGE_FILE=$PACKAGE_FILE" >> $GITHUB_ENV
+          
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Content-Type: application/octet-stream" \
+            --data-binary "@$PACKAGE_FILE" \
+            https://api.github.com/repos/${{ github.repository }}/packages/generic/s3-proxy/${{ steps.version.outputs.version }}/$PACKAGE_FILE
+
+      - name: Upload ${{ matrix.package_type }} artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: s3-proxy-${{ matrix.package_type }}
+          path: "*.rpm *.deb"
+
   create-release:
-    needs: [build-and-push, build-binaries]
+    needs: [build-and-push, build-binaries, build-packages]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -143,6 +226,10 @@ jobs:
             ## Binaries
             
             Download the binary for your platform from the assets below.
+            
+            ## Packages
+            
+            RPM and DEB packages are available in [GitHub Packages](https://github.com/${{ github.repository }}/packages).
           files: |
             artifacts/**/*
           draft: false

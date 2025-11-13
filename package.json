@@ -1,0 +1,8 @@
+{
+  "name": "s3-proxy",
+  "version": "1.0.0",
+  "description": "A lightweight S3-compatible proxy optimized for ZeroFS",
+  "maintainer": "Stackblaze",
+  "license": "MIT"
+}
+
