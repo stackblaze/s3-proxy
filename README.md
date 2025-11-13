@@ -146,6 +146,31 @@ allow_http = "true"
 - ✅ Conditional writes (If-None-Match)
 - ✅ Path handling for single-bucket proxy
 - ✅ Optimized for ZeroFS NBD devices
+- ✅ YAML configuration with hot-reload
+- ✅ Multi-bucket/backend support
+
+## Testing
+
+Run tests:
+
+```bash
+# Run all tests
+go test ./...
+
+# Verbose output
+go test -v ./...
+
+# With coverage
+go test -cover ./...
+
+# Using Makefile
+make test
+```
+
+**Test Requirements:**
+- All tests must pass before merging PRs
+- CI/CD runs tests on every push
+- Pre-commit hook available (optional)
 
 ## License
 
