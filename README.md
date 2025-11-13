@@ -2,11 +2,21 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A lightweight S3-compatible proxy optimized for ZeroFS. Proxies S3 requests to backend storage (Wasabi, AWS S3, Backblaze, etc.) with support for Range requests, DELETE operations, and conditional writes.
-
-**Open Source** - Licensed under MIT License
+A lightweight S3-compatible proxy optimized for ZeroFS. Supports Range requests, DELETE operations, and conditional writes.
 
 ## Quick Start
+
+### Docker
+
+```bash
+docker run -d -p 8080:8080 \
+  -e S3PROXY_AWS_KEY=your-key \
+  -e S3PROXY_AWS_SECRET=your-secret \
+  -e S3PROXY_AWS_REGION=us-east-1 \
+  -e S3PROXY_AWS_BUCKET=your-bucket \
+  -e S3PROXY_AWS_ENDPOINT=https://s3.wasabisys.com \
+  ghcr.io/stackblaze/s3-proxy:latest
+```
 
 ### Install Binary
 
@@ -14,163 +24,72 @@ A lightweight S3-compatible proxy optimized for ZeroFS. Proxies S3 requests to b
 curl -sSfL https://raw.githubusercontent.com/stackblaze/s3-proxy/main/scripts/install.sh | sh
 ```
 
-Or download manually from [releases](https://github.com/stackblaze/s3-proxy/releases).
-
-### Docker
-
-```bash
-docker run -d \
-  -p 8080:8080 \
-  -e S3PROXY_AWS_KEY=your-access-key \
-  -e S3PROXY_AWS_SECRET=your-secret-key \
-  -e S3PROXY_AWS_REGION=us-east-1 \
-  -e S3PROXY_AWS_BUCKET=your-bucket \
-  -e S3PROXY_AWS_ENDPOINT=https://s3.wasabisys.com \
-  ghcr.io/stackblaze/s3-proxy:latest
-```
+Or download from [releases](https://github.com/stackblaze/s3-proxy/releases).
 
 ### Local Build
 
 ```bash
-# Clone and build
-git clone https://github.com/stackblaze/s3-proxy.git
-cd s3-proxy
-go build -o s3-proxy
-
-# Run
-./s3-proxy -port 8080
+git clone https://github.com/stackblaze/s3-proxy.git && cd s3-proxy
+go build -o s3-proxy && ./s3-proxy -port 8080
 ```
 
-### Environment Variables
+## Configuration
 
-**Single Mode** (one bucket):
-- `S3PROXY_AWS_KEY` - S3 access key (required)
-- `S3PROXY_AWS_SECRET` - S3 secret key (required)
-- `S3PROXY_AWS_REGION` - S3 region (default: us-east-1)
-- `S3PROXY_AWS_BUCKET` - S3 bucket name (required)
-- `S3PROXY_AWS_ENDPOINT` - S3 endpoint URL (optional, for Wasabi, Backblaze, MinIO, etc.)
+### Single Mode
 
-**Multi Mode** (multiple buckets/backends):
-- `S3PROXY_CONFIG` - YAML or JSON array of configurations (see example below)
+Environment variables:
+- `S3PROXY_AWS_KEY` (required)
+- `S3PROXY_AWS_SECRET` (required)
+- `S3PROXY_AWS_REGION` (default: us-east-1)
+- `S3PROXY_AWS_BUCKET` (required)
+- `S3PROXY_AWS_ENDPOINT` (optional)
 
-### Multiple Buckets / Backends
+### Multi Mode
 
-Configure multiple buckets with different backends (Backblaze, Wasabi, AWS S3, etc.):
+Set `S3PROXY_CONFIG` as YAML or JSON array:
 
-**YAML Format (Recommended):**
 ```yaml
 - host: wasabi.localhost
-  awsKey: wasabi-access-key
-  awsSecret: wasabi-secret-key
+  awsKey: key
+  awsSecret: secret
   awsRegion: us-east-1
-  awsBucket: my-wasabi-bucket
+  awsBucket: bucket
   awsEndpoint: https://s3.wasabisys.com
-
-- host: backblaze.localhost
-  awsKey: backblaze-key-id
-  awsSecret: backblaze-application-key
-  awsRegion: us-west-004
-  awsBucket: my-backblaze-bucket
-  awsEndpoint: https://s3.us-west-004.backblazeb2.com
-
-- host: aws.localhost
-  awsKey: aws-access-key
-  awsSecret: aws-secret-key
-  awsRegion: us-east-1
-  awsBucket: my-aws-bucket
 ```
 
-**JSON Format (also supported):**
-```bash
-export S3PROXY_CONFIG='[{"host":"wasabi.localhost","awsKey":"key","awsSecret":"secret","awsRegion":"us-east-1","awsBucket":"bucket","awsEndpoint":"https://s3.wasabisys.com"}]'
-```
+### Hot-Reload
 
-**Docker Example (Environment Variable):**
-```bash
-docker run -d \
-  -p 8080:8080 \
-  -e S3PROXY_CONFIG='[{"host":"wasabi.localhost","awsKey":"key","awsSecret":"secret","awsRegion":"us-east-1","awsBucket":"bucket","awsEndpoint":"https://s3.wasabisys.com"}]' \
-  ghcr.io/stackblaze/s3-proxy:latest
-```
-
-### Hot-Reload Configuration (No Restart Required)
-
-Use a config file for real-time configuration updates without restarting:
+Use `-config-file` for real-time updates without restart:
 
 ```bash
-# Create YAML config file (see examples/config.example.yaml)
-cat > config.yaml << 'EOF'
-- host: wasabi.localhost
-  awsKey: wasabi-key
-  awsSecret: wasabi-secret
-  awsRegion: us-east-1
-  awsBucket: my-bucket
-  awsEndpoint: https://s3.wasabisys.com
-EOF
-
-# Start with config file (auto-reloads on changes)
 ./s3-proxy -config-file config.yaml -port 8080
 ```
 
-**Docker with Config File:**
-```bash
-docker run -d \
-  -p 8080:8080 \
-  -v $(pwd)/config.yaml:/app/config.yaml \
-  ghcr.io/stackblaze/s3-proxy:latest \
-  -config-file /app/config.yaml
-```
+Configuration reloads automatically on file changes (~100ms).
 
-**How it works:**
-- Edit `config.yaml` and save
-- Configuration reloads automatically within ~100ms
-- No proxy restart needed
-- Changes take effect immediately
-
-**Note:** Multi-mode routes requests based on the `Host` header. Configure DNS or use `/etc/hosts` to point different hostnames to the proxy.
-
-### ZeroFS Configuration
+## ZeroFS
 
 ```toml
 [aws]
-access_key_id = "your-access-key"
-secret_access_key = "your-secret-key"
-endpoint = "http://localhost:8080"  # Proxy endpoint
+access_key_id = "your-key"
+secret_access_key = "your-secret"
+endpoint = "http://localhost:8080"
 allow_http = "true"
 ```
 
 ## Features
 
-- ✅ Range request support (partial file reads)
-- ✅ DELETE method support
-- ✅ Conditional writes (If-None-Match)
-- ✅ Path handling for single-bucket proxy
-- ✅ Optimized for ZeroFS NBD devices
-- ✅ YAML configuration with hot-reload
-- ✅ Multi-bucket/backend support
+- Range requests, DELETE, conditional writes
+- Multi-bucket/backend support
+- YAML config with hot-reload
+- Optimized for ZeroFS
 
 ## Testing
 
-Run tests:
-
 ```bash
-# Run all tests
-go test ./...
-
-# Verbose output
-go test -v ./...
-
-# With coverage
-go test -cover ./...
-
-# Using Makefile
-make test
+go test ./...        # Run all tests
+make test           # Using Makefile
 ```
-
-**Test Requirements:**
-- All tests must pass before merging PRs
-- CI/CD runs tests on every push
-- Pre-commit hook available (optional)
 
 ## License
 
