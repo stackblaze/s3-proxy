@@ -27,7 +27,7 @@ jobs:
         run: go build -o s3-proxy .
 
       - name: Test
-        run: go test ./... || true
+        run: go test -v ./...
 
   docker-build:
     runs-on: ubuntu-latest
