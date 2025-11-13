@@ -13,12 +13,12 @@ A lightweight S3-compatible proxy optimized for ZeroFS. Proxies S3 requests to b
 ```bash
 docker run -d \
   -p 8080:8080 \
-  -e AWS_ACCESS_KEY_ID=your-access-key \
-  -e AWS_SECRET_ACCESS_KEY=your-secret-key \
-  -e AWS_REGION=us-east-1 \
-  -e AWS_BUCKET=your-bucket \
-  -e AWS_ENDPOINT=https://s3.wasabisys.com \
-  stackblaze/s3-proxy:latest
+  -e S3PROXY_AWS_KEY=your-access-key \
+  -e S3PROXY_AWS_SECRET=your-secret-key \
+  -e S3PROXY_AWS_REGION=us-east-1 \
+  -e S3PROXY_AWS_BUCKET=your-bucket \
+  -e S3PROXY_AWS_ENDPOINT=https://s3.wasabisys.com \
+  ghcr.io/stackblaze/s3-proxy:latest
 ```
 
 ### Local Build
@@ -82,7 +82,7 @@ export S3PROXY_CONFIG='[{"host":"wasabi.localhost","awsKey":"key","awsSecret":"s
 docker run -d \
   -p 8080:8080 \
   -e S3PROXY_CONFIG='[{"host":"wasabi.localhost","awsKey":"key","awsSecret":"secret","awsRegion":"us-east-1","awsBucket":"bucket","awsEndpoint":"https://s3.wasabisys.com"}]' \
-  stackblaze/s3-proxy:latest
+  ghcr.io/stackblaze/s3-proxy:latest
 ```
 
 ### Hot-Reload Configuration (No Restart Required)
@@ -109,7 +109,7 @@ EOF
 docker run -d \
   -p 8080:8080 \
   -v $(pwd)/config.yaml:/app/config.yaml \
-  stackblaze/s3-proxy:latest \
+  ghcr.io/stackblaze/s3-proxy:latest \
   -config-file /app/config.yaml
 ```
 

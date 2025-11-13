@@ -41,7 +41,7 @@ jobs:
         with:
           context: .
           push: false
-          tags: stackblaze/s3-proxy:test
-          cache-from: type=registry,ref=stackblaze/s3-proxy:buildcache
-          cache-to: type=registry,ref=stackblaze/s3-proxy:buildcache,mode=max
+          tags: ghcr.io/stackblaze/s3-proxy:test
+          cache-from: type=registry,ref=ghcr.io/stackblaze/s3-proxy:buildcache
+          cache-to: type=registry,ref=ghcr.io/stackblaze/s3-proxy:buildcache,mode=max
 
