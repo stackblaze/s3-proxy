@@ -1,0 +1,28 @@
+[Unit]
+Description=S3 Proxy - A lightweight S3-compatible proxy optimized for ZeroFS
+Documentation=https://github.com/stackblaze/s3-proxy
+After=network.target
+
+[Service]
+Type=simple
+User=s3-proxy
+Group=s3-proxy
+ExecStart=/bin/sh -c 'if [ -f /etc/s3-proxy/config.yaml ]; then /usr/local/bin/s3-proxy -port 8080 -config-file /etc/s3-proxy/config.yaml; else /usr/local/bin/s3-proxy -port 8080; fi'
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:/var/log/s3-proxy/s3-proxy.log
+StandardError=append:/var/log/s3-proxy/s3-proxy.log
+SyslogIdentifier=s3-proxy
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/log/s3-proxy /etc/s3-proxy
+
+# Environment file (optional, for single-mode config)
+EnvironmentFile=-/etc/s3-proxy/s3-proxy.conf
+
+[Install]
+WantedBy=multi-user.target

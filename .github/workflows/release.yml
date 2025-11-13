@@ -141,8 +141,56 @@ jobs:
       - name: Build ${{ matrix.package_type }} package
         run: |
           chmod +x binary/s3-proxy-linux-amd64
+          
+          # Create package directory structure
           mkdir -p pkg/usr/local/bin
+          mkdir -p pkg/etc/systemd/system
+          mkdir -p pkg/etc/s3-proxy
+          mkdir -p pkg/var/log/s3-proxy
+          mkdir -p pkg/usr/lib/tmpfiles.d
+          
+          # Copy binary
           cp binary/s3-proxy-linux-amd64 pkg/usr/local/bin/s3-proxy
+          
+          # Copy systemd service file
+          cp s3-proxy.service pkg/etc/systemd/system/s3-proxy.service
+          
+          # Copy example config
+          cp s3-proxy.conf.example pkg/etc/s3-proxy/s3-proxy.conf.example
+          
+          # Create tmpfiles.d for log directory
+          echo "d /var/log/s3-proxy 0755 s3-proxy s3-proxy -" > pkg/usr/lib/tmpfiles.d/s3-proxy.conf
+          
+          # Create post-install script
+          mkdir -p pkg/tmp
+          cat > pkg/tmp/postinstall.sh << 'EOF'
+          #!/bin/bash
+          # Create s3-proxy user if it doesn't exist
+          if ! id -u s3-proxy >/dev/null 2>&1; then
+            useradd -r -s /bin/false -d /var/lib/s3-proxy s3-proxy
+          fi
+          
+          # Set ownership of log directory
+          chown s3-proxy:s3-proxy /var/log/s3-proxy
+          chmod 755 /var/log/s3-proxy
+          
+          # Set ownership of config directory
+          chown root:s3-proxy /etc/s3-proxy
+          chmod 750 /etc/s3-proxy
+          
+          # Reload systemd
+          systemctl daemon-reload
+          EOF
+          chmod +x pkg/tmp/postinstall.sh
+          
+          # Create pre-uninstall script
+          cat > pkg/tmp/preuninstall.sh << 'EOF'
+          #!/bin/bash
+          # Stop service before uninstall
+          systemctl stop s3-proxy 2>/dev/null || true
+          systemctl disable s3-proxy 2>/dev/null || true
+          EOF
+          chmod +x pkg/tmp/preuninstall.sh
           
           if [ "${{ matrix.package_type }}" == "rpm" ]; then
             fpm -s dir -t rpm \
@@ -152,8 +200,12 @@ jobs:
               --description "A lightweight S3-compatible proxy optimized for ZeroFS" \
               --url https://github.com/stackblaze/s3-proxy \
               --maintainer "Stackblaze <noreply@stackblaze.com>" \
+              --after-install pkg/tmp/postinstall.sh \
+              --before-remove pkg/tmp/preuninstall.sh \
+              --rpm-user s3-proxy \
+              --rpm-group s3-proxy \
               -C pkg \
-              usr
+              usr etc var
           else
             fpm -s dir -t deb \
               -n s3-proxy \
@@ -162,8 +214,12 @@ jobs:
               --description "A lightweight S3-compatible proxy optimized for ZeroFS" \
               --url https://github.com/stackblaze/s3-proxy \
               --maintainer "Stackblaze <noreply@stackblaze.com>" \
+              --after-install pkg/tmp/postinstall.sh \
+              --before-remove pkg/tmp/preuninstall.sh \
+              --deb-user s3-proxy \
+              --deb-group s3-proxy \
               -C pkg \
-              usr
+              usr etc var
           fi
 
       - name: Publish ${{ matrix.package_type }} to GitHub Packages
