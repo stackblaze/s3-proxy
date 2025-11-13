@@ -66,6 +66,38 @@ None - this is a feature addition that maintains backward compatibility.
 ## Migration
 No migration required. Existing functionality remains unchanged.
 
+## Upgrading
+
+### Quick Upgrade (Recommended)
+
+If you installed using the install script, simply run it again:
+
+```bash
+curl -sSfL https://raw.githubusercontent.com/stackblaze/s3-proxy/main/scripts/install.sh | sh
+```
+
+The script will automatically download v1.1.0 and replace your existing binary.
+
+### Manual Upgrade
+
+Download the binary from the [releases page](https://github.com/stackblaze/s3-proxy/releases/tag/v1.1.0) and replace your existing `s3-proxy` binary.
+
+**For systemd users:**
+```bash
+# Stop the service
+sudo systemctl stop s3-proxy
+
+# Download and install new binary
+curl -L -o s3-proxy https://github.com/stackblaze/s3-proxy/releases/download/v1.1.0/s3-proxy
+chmod +x s3-proxy
+sudo mv s3-proxy /usr/local/bin/s3-proxy
+
+# Restart the service
+sudo systemctl start s3-proxy
+```
+
+See [UPGRADE.md](UPGRADE.md) for complete upgrade instructions.
+
 ## GitHub Release
 
 To create a GitHub release:
