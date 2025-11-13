@@ -136,7 +136,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y ruby ruby-dev build-essential rpm
-          sudo gem install fpm -v 1.15.0
+          # Install fpm 1.16.0+ which is compatible with Ruby 3.2+
+          # or use Ruby 3.1 or earlier
+          sudo gem install fpm -v 1.16.0 || sudo gem install fpm
 
       - name: Build ${{ matrix.package_type }} package
         run: |
