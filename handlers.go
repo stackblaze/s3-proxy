@@ -189,17 +189,7 @@ func NewProxyHandler(proxy S3Proxy, prefix string, bucketName string) http.Handl
 func handleGet(proxy S3Proxy, key string, w http.ResponseWriter, r *http.Request) {
 	obj, err := proxy.Get(key)
 	if err != nil {
-		if awsErr, ok := err.(awserr.Error); ok {
-			switch awsErr.Code() {
-			case s3.ErrCodeNoSuchBucket, s3.ErrCodeNoSuchKey:
-				http.Error(w, err.Error(), http.StatusNotFound)
-			default:
-				http.Error(w, err.Error(), http.StatusUnauthorized)
-			}
-		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-
+		handleS3Error(w, err)
 		return
 	}
 
@@ -242,16 +232,7 @@ func handlePut(proxy S3Proxy, key string, w http.ResponseWriter, r *http.Request
 	// Put object to S3
 	result, err := proxy.Put(key, bytes.NewReader(body), contentType)
 	if err != nil {
-		if awsErr, ok := err.(awserr.Error); ok {
-			switch awsErr.Code() {
-			case s3.ErrCodeNoSuchBucket:
-				http.Error(w, err.Error(), http.StatusNotFound)
-			default:
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-			}
-		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
+		handleS3Error(w, err)
 		return
 	}
 
@@ -271,16 +252,7 @@ func handleCreateMultipartUpload(proxy S3Proxy, r *http.Request, w http.Response
 
 	result, err := proxy.CreateMultipartUpload(key, contentType)
 	if err != nil {
-		if awsErr, ok := err.(awserr.Error); ok {
-			switch awsErr.Code() {
-			case s3.ErrCodeNoSuchBucket:
-				http.Error(w, err.Error(), http.StatusNotFound)
-			default:
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-			}
-		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
+		handleS3Error(w, err)
 		return
 	}
 
@@ -331,16 +303,7 @@ func handleUploadPart(proxy S3Proxy, r *http.Request, w http.ResponseWriter) {
 
 	result, err := proxy.UploadPart(key, uploadId, partNumber, bytes.NewReader(body))
 	if err != nil {
-		if awsErr, ok := err.(awserr.Error); ok {
-			switch awsErr.Code() {
-			case s3.ErrCodeNoSuchBucket, s3.ErrCodeNoSuchUpload:
-				http.Error(w, err.Error(), http.StatusNotFound)
-			default:
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-			}
-		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
+		handleS3Error(w, err)
 		return
 	}
 
@@ -387,16 +350,7 @@ func handleCompleteMultipartUpload(proxy S3Proxy, r *http.Request, w http.Respon
 
 	result, err := proxy.CompleteMultipartUpload(key, uploadId, parts)
 	if err != nil {
-		if awsErr, ok := err.(awserr.Error); ok {
-			switch awsErr.Code() {
-			case s3.ErrCodeNoSuchBucket, s3.ErrCodeNoSuchUpload:
-				http.Error(w, err.Error(), http.StatusNotFound)
-			default:
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-			}
-		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
+		handleS3Error(w, err)
 		return
 	}
 
@@ -436,16 +390,7 @@ func handleAbortMultipartUpload(proxy S3Proxy, r *http.Request, w http.ResponseW
 
 	_, err := proxy.AbortMultipartUpload(key, uploadId)
 	if err != nil {
-		if awsErr, ok := err.(awserr.Error); ok {
-			switch awsErr.Code() {
-			case s3.ErrCodeNoSuchBucket, s3.ErrCodeNoSuchUpload:
-				http.Error(w, err.Error(), http.StatusNotFound)
-			default:
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-			}
-		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
+		handleS3Error(w, err)
 		return
 	}
 
@@ -466,16 +411,7 @@ func handleListMultipartUploads(proxy S3Proxy, r *http.Request, w http.ResponseW
 
 	result, err := proxy.ListMultipartUploads(prefix, delimiter, maxUploads)
 	if err != nil {
-		if awsErr, ok := err.(awserr.Error); ok {
-			switch awsErr.Code() {
-			case s3.ErrCodeNoSuchBucket:
-				http.Error(w, err.Error(), http.StatusNotFound)
-			default:
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-			}
-		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
+		handleS3Error(w, err)
 		return
 	}
 
@@ -632,16 +568,7 @@ func handleList(proxy S3Proxy, r *http.Request, w http.ResponseWriter, bucketNam
 	// List objects
 	result, err := proxy.ListObjects(prefix, delimiter, maxKeys, continuationToken)
 	if err != nil {
-		if awsErr, ok := err.(awserr.Error); ok {
-			switch awsErr.Code() {
-			case s3.ErrCodeNoSuchBucket:
-				http.Error(w, err.Error(), http.StatusNotFound)
-			default:
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-			}
-		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
+		handleS3Error(w, err)
 		return
 	}
 
@@ -774,4 +701,35 @@ func setHeader(w http.ResponseWriter, key, value string) {
 	if value != "" {
 		w.Header().Add(key, value)
 	}
+}
+
+// handleS3Error properly maps AWS S3 errors to HTTP status codes
+// and passes through the original S3 error status codes (like 403 for SignatureDoesNotMatch)
+func handleS3Error(w http.ResponseWriter, err error) {
+	// Check if it's an AWS RequestFailure (has HTTP status code)
+	if reqErr, ok := err.(awserr.RequestFailure); ok {
+		statusCode := reqErr.StatusCode()
+		// Pass through the original HTTP status code from S3
+		// This ensures 403 SignatureDoesNotMatch is returned as 403, not 500
+		http.Error(w, err.Error(), statusCode)
+		return
+	}
+
+	// Check if it's a generic AWS error
+	if awsErr, ok := err.(awserr.Error); ok {
+		switch awsErr.Code() {
+		case s3.ErrCodeNoSuchBucket, s3.ErrCodeNoSuchKey:
+			http.Error(w, err.Error(), http.StatusNotFound)
+		case "SignatureDoesNotMatch", "InvalidAccessKeyId", "AccessDenied":
+			// These should be 403, but if RequestFailure wasn't available, use 403
+			http.Error(w, err.Error(), http.StatusForbidden)
+		default:
+			// For other AWS errors, try to infer status or use 500
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	// Non-AWS error
+	http.Error(w, err.Error(), http.StatusInternalServerError)
 }
