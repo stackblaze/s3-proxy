@@ -1,0 +1,13 @@
+# S3 Proxy Configuration
+# Copy this file to /etc/s3-proxy/s3-proxy.conf and customize
+
+# Single Mode Configuration
+S3PROXY_AWS_KEY=your-access-key
+S3PROXY_AWS_SECRET=your-secret-key
+S3PROXY_AWS_REGION=us-east-1
+S3PROXY_AWS_BUCKET=your-bucket
+S3PROXY_AWS_ENDPOINT=https://s3.wasabisys.com
+
+# Or use Multi Mode with YAML config file
+# S3PROXY_CONFIG_FILE=/etc/s3-proxy/config.yaml
+

@@ -1,0 +1,14 @@
+#!/bin/sh
+# Pre-commit hook to run tests before committing
+
+echo "Running tests before commit..."
+go test ./...
+
+if [ $? -ne 0 ]; then
+    echo "❌ Tests failed! Commit aborted."
+    echo "Fix the failing tests before committing."
+    exit 1
+fi
+
+echo "✅ All tests passed!"
+

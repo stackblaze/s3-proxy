@@ -1,0 +1,298 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g., v1.0.0)'
+        required: true
+        type: string
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION=${GITHUB_REF#refs/tags/}
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "VERSION=$VERSION"
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/stackblaze/s3-proxy:${{ steps.version.outputs.version }}
+            ghcr.io/stackblaze/s3-proxy:latest
+          cache-from: type=registry,ref=ghcr.io/stackblaze/s3-proxy:buildcache
+          cache-to: type=registry,ref=ghcr.io/stackblaze/s3-proxy:buildcache,mode=max
+
+  build-binaries:
+    strategy:
+      matrix:
+        goos: [linux, darwin, windows]
+        goarch: [amd64, arm64]
+        exclude:
+          - goos: windows
+            goarch: arm64
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Extract version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION=${GITHUB_REF#refs/tags/}
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+        run: |
+          OUTPUT="s3-proxy-${{ matrix.goos }}-${{ matrix.goarch }}"
+          if [ "${{ matrix.goos }}" == "windows" ]; then
+            OUTPUT="${OUTPUT}.exe"
+          fi
+          go build -a -installsuffix cgo -o $OUTPUT .
+          echo "binary=$OUTPUT" >> $GITHUB_OUTPUT
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: s3-proxy-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: s3-proxy-*
+
+  build-packages:
+    needs: [build-binaries]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        package_type: [rpm, deb]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION=${GITHUB_REF#refs/tags/}
+          fi
+          # Remove 'v' prefix if present
+          VERSION=${VERSION#v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "VERSION=$VERSION"
+
+      - name: Download Linux binary
+        uses: actions/download-artifact@v4
+        with:
+          name: s3-proxy-linux-amd64
+          path: ./binary
+
+      - name: Set up Ruby for fpm
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ruby ruby-dev build-essential rpm
+          sudo gem install fpm -v 1.15.0
+
+      - name: Build ${{ matrix.package_type }} package
+        run: |
+          chmod +x binary/s3-proxy-linux-amd64
+          
+          # Create package directory structure
+          mkdir -p pkg/usr/local/bin
+          mkdir -p pkg/etc/systemd/system
+          mkdir -p pkg/etc/s3-proxy
+          mkdir -p pkg/var/log/s3-proxy
+          mkdir -p pkg/usr/lib/tmpfiles.d
+          
+          # Copy binary
+          cp binary/s3-proxy-linux-amd64 pkg/usr/local/bin/s3-proxy
+          
+          # Copy systemd service file
+          cp s3-proxy.service pkg/etc/systemd/system/s3-proxy.service
+          
+          # Copy example config
+          cp s3-proxy.conf.example pkg/etc/s3-proxy/s3-proxy.conf.example
+          
+          # Create tmpfiles.d for log directory
+          echo "d /var/log/s3-proxy 0755 s3-proxy s3-proxy -" > pkg/usr/lib/tmpfiles.d/s3-proxy.conf
+          
+          # Create post-install script
+          mkdir -p pkg/tmp
+          cat > pkg/tmp/postinstall.sh << 'EOF'
+          #!/bin/bash
+          # Create s3-proxy user if it doesn't exist
+          if ! id -u s3-proxy >/dev/null 2>&1; then
+            useradd -r -s /bin/false -d /var/lib/s3-proxy s3-proxy
+          fi
+          
+          # Set ownership of log directory
+          chown s3-proxy:s3-proxy /var/log/s3-proxy
+          chmod 755 /var/log/s3-proxy
+          
+          # Set ownership of config directory
+          chown root:s3-proxy /etc/s3-proxy
+          chmod 750 /etc/s3-proxy
+          
+          # Reload systemd
+          systemctl daemon-reload
+          EOF
+          chmod +x pkg/tmp/postinstall.sh
+          
+          # Create pre-uninstall script
+          cat > pkg/tmp/preuninstall.sh << 'EOF'
+          #!/bin/bash
+          # Stop service before uninstall
+          systemctl stop s3-proxy 2>/dev/null || true
+          systemctl disable s3-proxy 2>/dev/null || true
+          EOF
+          chmod +x pkg/tmp/preuninstall.sh
+          
+          if [ "${{ matrix.package_type }}" == "rpm" ]; then
+            fpm -s dir -t rpm \
+              -n s3-proxy \
+              -v ${{ steps.version.outputs.version }} \
+              --license MIT \
+              --description "A lightweight S3-compatible proxy optimized for ZeroFS" \
+              --url https://github.com/stackblaze/s3-proxy \
+              --maintainer "Stackblaze <noreply@stackblaze.com>" \
+              --after-install pkg/tmp/postinstall.sh \
+              --before-remove pkg/tmp/preuninstall.sh \
+              --rpm-user s3-proxy \
+              --rpm-group s3-proxy \
+              -C pkg \
+              usr etc var
+          else
+            fpm -s dir -t deb \
+              -n s3-proxy \
+              -v ${{ steps.version.outputs.version }} \
+              --license MIT \
+              --description "A lightweight S3-compatible proxy optimized for ZeroFS" \
+              --url https://github.com/stackblaze/s3-proxy \
+              --maintainer "Stackblaze <noreply@stackblaze.com>" \
+              --after-install pkg/tmp/postinstall.sh \
+              --before-remove pkg/tmp/preuninstall.sh \
+              --deb-user s3-proxy \
+              --deb-group s3-proxy \
+              -C pkg \
+              usr etc var
+          fi
+
+      - name: Publish ${{ matrix.package_type }} to GitHub Packages
+        run: |
+          PACKAGE_FILE=$(ls *.rpm *.deb 2>/dev/null | head -1)
+          echo "PACKAGE_FILE=$PACKAGE_FILE" >> $GITHUB_ENV
+          
+          # Upload to GitHub Packages (generic package type)
+          curl -X PUT \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Content-Type: application/octet-stream" \
+            --data-binary "@$PACKAGE_FILE" \
+            "https://api.github.com/repos/${{ github.repository }}/packages/generic/s3-proxy/${{ steps.version.outputs.version }}/$PACKAGE_FILE"
+
+      - name: Upload ${{ matrix.package_type }} artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: s3-proxy-${{ matrix.package_type }}
+          path: "*.rpm *.deb"
+
+  create-release:
+    needs: [build-and-push, build-binaries, build-packages]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION=${GITHUB_REF#refs/tags/}
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+          pattern: '*'
+          merge-multiple: false
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          name: Release ${{ steps.version.outputs.version }}
+          body: |
+            ## Changes
+            
+            See [CHANGELOG.md](CHANGELOG.md) for details.
+            
+            ## Docker Image
+            
+            ```bash
+            docker pull ghcr.io/stackblaze/s3-proxy:${{ steps.version.outputs.version }}
+            ```
+            
+            ## Binaries
+            
+            Download the binary for your platform from the assets below.
+            
+            ## Packages
+            
+            RPM and DEB packages are available in [GitHub Packages](https://github.com/${{ github.repository }}/packages).
+          files: |
+            artifacts/**/*
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
