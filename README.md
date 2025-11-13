@@ -1,6 +1,10 @@
 # S3 Proxy
 
-A lightweight S3-compatible proxy optimized for ZeroFS. Proxies S3 requests to backend storage (Wasabi, AWS S3, etc.) with support for Range requests, DELETE operations, and conditional writes.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+A lightweight S3-compatible proxy optimized for ZeroFS. Proxies S3 requests to backend storage (Wasabi, AWS S3, Backblaze, etc.) with support for Range requests, DELETE operations, and conditional writes.
+
+**Open Source** - Licensed under MIT License
 
 ## Quick Start
 
