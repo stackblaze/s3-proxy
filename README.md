@@ -98,7 +98,7 @@ docker run -d \
 Use a config file for real-time configuration updates without restarting:
 
 ```bash
-# Create YAML config file
+# Create YAML config file (see examples/config.example.yaml)
 cat > config.yaml << 'EOF'
 - host: wasabi.localhost
   awsKey: wasabi-key
