@@ -14,14 +14,14 @@ You'll need to authenticate to push. Choose one method:
 
 **Option A: Personal Access Token (HTTPS)**
 ```bash
-git remote set-url origin https://YOUR_TOKEN@github.com/jcomo/s3-proxy.git
+git remote set-url origin https://YOUR_TOKEN@github.com/stackblaze/s3-proxy.git
 ```
 
 **Option B: SSH Key**
 ```bash
 # Ensure your SSH key is added to GitHub
 ssh -T git@github.com
-git remote set-url origin git@github.com:jcomo/s3-proxy.git
+git remote set-url origin git@github.com:stackblaze/s3-proxy.git
 ```
 
 ### 2. Push Code and Tag
@@ -39,7 +39,7 @@ git push origin v1.1.0
 ### 3. Create GitHub Release
 
 **Via GitHub Web UI:**
-1. Go to: https://github.com/jcomo/s3-proxy/releases/new
+1. Go to: https://github.com/stackblaze/s3-proxy/releases/new
 2. **Tag:** Select `v1.1.0` (or create new tag)
 3. **Title:** `v1.1.0 - Multipart Upload Support`
 4. **Description:** Copy from `RELEASE.md` file

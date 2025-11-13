@@ -16,6 +16,7 @@ func TestReloadableHandler_ConfigFile(t *testing.T) {
   awsSecret: test-secret
   awsRegion: us-east-1
   awsBucket: test-bucket
+  awsEndpoint: ""
 `
 	
 	err := os.WriteFile(configFile, []byte(configContent), 0644)
