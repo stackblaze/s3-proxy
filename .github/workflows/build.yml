@@ -45,7 +45,8 @@ jobs:
         with:
           context: .
           push: false
-          tags: ghcr.io/stackblaze/s3-proxy:test
+          tags: s3-proxy:test
+          load: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
