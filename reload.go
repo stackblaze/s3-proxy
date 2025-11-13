@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net/http"
 	"os"
 	"sync"
 	"time"
@@ -68,7 +69,7 @@ func (rh *ReloadableHandler) reload() error {
 
 	// Create new handler
 	handler := NewHostDispatchingHandler()
-	for i, site := range cfg {
+	for _, site := range cfg {
 		if err := site.validateWithHost(); err != nil {
 			return err
 		}
