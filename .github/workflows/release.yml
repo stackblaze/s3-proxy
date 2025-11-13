@@ -171,11 +171,12 @@ jobs:
           PACKAGE_FILE=$(ls *.rpm *.deb 2>/dev/null | head -1)
           echo "PACKAGE_FILE=$PACKAGE_FILE" >> $GITHUB_ENV
           
-          curl -X POST \
+          # Upload to GitHub Packages (generic package type)
+          curl -X PUT \
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             -H "Content-Type: application/octet-stream" \
             --data-binary "@$PACKAGE_FILE" \
-            https://api.github.com/repos/${{ github.repository }}/packages/generic/s3-proxy/${{ steps.version.outputs.version }}/$PACKAGE_FILE
+            "https://api.github.com/repos/${{ github.repository }}/packages/generic/s3-proxy/${{ steps.version.outputs.version }}/$PACKAGE_FILE"
 
       - name: Upload ${{ matrix.package_type }} artifact
         uses: actions/upload-artifact@v4
@@ -206,6 +207,8 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: ./artifacts
+          pattern: '*'
+          merge-multiple: false
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
