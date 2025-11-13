@@ -225,16 +225,24 @@ jobs:
           fi
 
       - name: Publish ${{ matrix.package_type }} to GitHub Packages
+        continue-on-error: true
         run: |
           PACKAGE_FILE=$(ls *.rpm *.deb 2>/dev/null | head -1)
+          if [ -z "$PACKAGE_FILE" ]; then
+            echo "No package file found, skipping upload"
+            exit 0
+          fi
           echo "PACKAGE_FILE=$PACKAGE_FILE" >> $GITHUB_ENV
           
           # Upload to GitHub Packages (generic package type)
-          curl -X PUT \
+          # Note: This may fail if the package doesn't exist in GitHub Packages yet
+          # Packages are still attached to releases via the create-release job
+          curl -f -X PUT \
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             -H "Content-Type: application/octet-stream" \
             --data-binary "@$PACKAGE_FILE" \
-            "https://api.github.com/repos/${{ github.repository }}/packages/generic/s3-proxy/${{ steps.version.outputs.version }}/$PACKAGE_FILE"
+            "https://api.github.com/repos/${{ github.repository }}/packages/generic/s3-proxy/${{ steps.version.outputs.version }}/$PACKAGE_FILE" \
+            || echo "Warning: Failed to upload to GitHub Packages (packages are still attached to release)"
 
       - name: Upload ${{ matrix.package_type }} artifact
         uses: actions/upload-artifact@v4
