@@ -29,6 +29,13 @@ jobs:
       - name: Test
         run: go test -v ./...
 
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: s3-proxy-linux-amd64
+          path: s3-proxy
+          retention-days: 30
+
   docker-build:
     runs-on: ubuntu-latest
     permissions:
@@ -49,4 +56,17 @@ jobs:
           load: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Save Docker image
+        if: success()
+        run: |
+          docker save s3-proxy:test | gzip > s3-proxy-docker-image.tar.gz
+
+      - name: Upload Docker image artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: s3-proxy-docker-image
+          path: s3-proxy-docker-image.tar.gz
+          retention-days: 30
 
