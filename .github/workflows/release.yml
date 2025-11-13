@@ -283,8 +283,8 @@ jobs:
         continue-on-error: true
         with:
           path: ./artifacts/packages
-          pattern: 's3-proxy-*.rpm s3-proxy-*.deb'
-          merge-multiple: false
+          pattern: 's3-proxy-*'
+          merge-multiple: true
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
@@ -311,7 +311,8 @@ jobs:
             RPM and DEB packages are available in [GitHub Packages](https://github.com/${{ github.repository }}/packages).
           files: |
             artifacts/binaries/**/*
-            artifacts/packages/**/*
+            artifacts/packages/**/*.rpm
+            artifacts/packages/**/*.deb
           draft: false
           prerelease: false
         env:
