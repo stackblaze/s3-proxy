@@ -27,5 +27,6 @@ COPY --from=builder /build/s3-proxy .
 EXPOSE 8080
 
 # Run the binary
-CMD ["./s3-proxy", "-port", "8080"]
+ENTRYPOINT ["./s3-proxy"]
+CMD ["-port", "8080"]
 
