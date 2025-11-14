@@ -2,6 +2,7 @@ package main
 
 import (
 	"io"
+	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -35,7 +36,10 @@ func NewS3Proxy(key, secret, region, bucket, endpoint string) S3Proxy {
 	
 	// Add custom endpoint if provided (for S3-compatible services like Wasabi)
 	if endpoint != "" {
-		cfg.Endpoint = aws.String(endpoint)
+		// Wasabi requires region-specific endpoints (e.g., s3.us-east-1.wasabisys.com)
+		// If a generic endpoint is provided, convert it to region-specific format
+		normalizedEndpoint := normalizeWasabiEndpoint(endpoint, region)
+		cfg.Endpoint = aws.String(normalizedEndpoint)
 		cfg.S3ForcePathStyle = aws.Bool(true) // Required for custom endpoints
 	}
 	
@@ -45,6 +49,31 @@ func NewS3Proxy(key, secret, region, bucket, endpoint string) S3Proxy {
 		bucket: bucket,
 		s3:     s3.New(sess),
 	}
+}
+
+// normalizeWasabiEndpoint converts generic Wasabi endpoints to region-specific ones
+// Wasabi requires region-specific endpoints for proper signature calculation
+// Example: s3.wasabisys.com -> s3.us-east-1.wasabisys.com
+func normalizeWasabiEndpoint(endpoint, region string) string {
+	// If endpoint already contains the region, return as-is
+	if strings.Contains(endpoint, region) {
+		return endpoint
+	}
+	
+	// Check if it's a Wasabi generic endpoint
+	if strings.Contains(endpoint, "wasabisys.com") {
+		// Replace s3.wasabisys.com with s3.{region}.wasabisys.com
+		if strings.Contains(endpoint, "s3.wasabisys.com") {
+			return strings.Replace(endpoint, "s3.wasabisys.com", "s3."+region+".wasabisys.com", 1)
+		}
+		// If it's already https://s3.wasabisys.com, convert to region-specific
+		if strings.HasPrefix(endpoint, "https://s3.wasabisys.com") {
+			return "https://s3." + region + ".wasabisys.com"
+		}
+	}
+	
+	// For other S3-compatible services, return as-is
+	return endpoint
 }
 
 func (p *RealS3Proxy) Get(key string) (*s3.GetObjectOutput, error) {
