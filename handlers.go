@@ -161,6 +161,9 @@ func NewProxyHandler(proxy S3Proxy, prefix string, bucketName string) http.Handl
 		case http.MethodPost:
 			// POST without multipart params - treat as regular PUT
 			handlePut(proxy, key, w, r)
+		case http.MethodDelete:
+			// DELETE without uploadId - regular object deletion
+			handleDelete(proxy, key, w, r)
 		default:
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}
@@ -233,6 +236,24 @@ func handlePut(proxy S3Proxy, key string, w http.ResponseWriter, r *http.Request
 		w.Header().Set("ETag", *result.ETag)
 	}
 	w.WriteHeader(http.StatusOK)
+}
+
+func handleDelete(proxy S3Proxy, key string, w http.ResponseWriter, r *http.Request) {
+	result, err := proxy.Delete(key)
+	if err != nil {
+		handleS3Error(w, err)
+		return
+	}
+
+	// S3 DeleteObject returns 204 No Content on success
+	// If DeleteMarker is set, return it in the response
+	if result.DeleteMarker != nil && *result.DeleteMarker {
+		w.Header().Set("x-amz-delete-marker", "true")
+	}
+	if result.VersionId != nil {
+		w.Header().Set("x-amz-version-id", *result.VersionId)
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func handleCreateMultipartUpload(proxy S3Proxy, r *http.Request, w http.ResponseWriter, bucketName string) {

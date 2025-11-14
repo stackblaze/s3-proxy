@@ -15,6 +15,7 @@ type S3Proxy interface {
 	Get(key string, rangeHeader string) (*s3.GetObjectOutput, error)
 	Put(key string, body io.ReadSeeker, contentType string) (*s3.PutObjectOutput, error)
 	Head(key string) (*s3.HeadObjectOutput, error)
+	Delete(key string) (*s3.DeleteObjectOutput, error)
 	ListObjects(prefix string, delimiter string, maxKeys int64, continuationToken string) (*s3.ListObjectsV2Output, error)
 	CreateMultipartUpload(key string, contentType string) (*s3.CreateMultipartUploadOutput, error)
 	UploadPart(key string, uploadId string, partNumber int64, body io.ReadSeeker) (*s3.UploadPartOutput, error)
@@ -104,6 +105,14 @@ func (p *RealS3Proxy) Head(key string) (*s3.HeadObjectOutput, error) {
 	}
 
 	return p.s3.HeadObject(req)
+}
+
+func (p *RealS3Proxy) Delete(key string) (*s3.DeleteObjectOutput, error) {
+	req := &s3.DeleteObjectInput{
+		Bucket: aws.String(p.bucket),
+		Key:    aws.String(key),
+	}
+	return p.s3.DeleteObject(req)
 }
 
 func (p *RealS3Proxy) Put(key string, body io.ReadSeeker, contentType string) (*s3.PutObjectOutput, error) {
