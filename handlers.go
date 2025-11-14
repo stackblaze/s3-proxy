@@ -106,7 +106,7 @@ func NewProxyHandler(proxy S3Proxy, prefix string, bucketName string) http.Handl
 
 		// InitiateMultipartUpload: POST with ?uploads (parameter may be empty, just needs to be present)
 		if hasUploads && r.Method == http.MethodPost {
-			handleCreateMultipartUpload(proxy, r, w)
+			handleCreateMultipartUpload(proxy, r, w, bucketName)
 			return
 		}
 
@@ -118,19 +118,19 @@ func NewProxyHandler(proxy S3Proxy, prefix string, bucketName string) http.Handl
 
 		// CompleteMultipartUpload: POST with ?uploadId
 		if uploadId != "" && r.Method == http.MethodPost {
-			handleCompleteMultipartUpload(proxy, r, w)
+			handleCompleteMultipartUpload(proxy, r, w, bucketName)
 			return
 		}
 
 		// AbortMultipartUpload: DELETE with ?uploadId
 		if uploadId != "" && r.Method == http.MethodDelete {
-			handleAbortMultipartUpload(proxy, r, w)
+			handleAbortMultipartUpload(proxy, r, w, bucketName)
 			return
 		}
 
 		// UploadPart: PUT with ?uploadId and ?partNumber
 		if uploadId != "" && partNumber != "" && r.Method == http.MethodPut {
-			handleUploadPart(proxy, r, w)
+			handleUploadPart(proxy, r, w, bucketName)
 			return
 		}
 
@@ -141,34 +141,15 @@ func NewProxyHandler(proxy S3Proxy, prefix string, bucketName string) http.Handl
 		}
 
 		// Extract key from path for regular operations
-		path := r.URL.Path
-		
-		// Handle bucket name in path (e.g., /sd-zerofs/...)
-		// Since we're a single-bucket proxy, strip the bucket name if present
-		path = strings.Trim(path, "/")
-		parts := strings.Split(path, "/")
-		
-		// If path starts with what looks like a bucket name, remove it
-		// This handles cases like /sd-zerofs/path/to/file
-		if len(parts) > 1 {
-			// Assume first part might be bucket name, but we can't be sure
-			// For now, use the full path and let S3 handle it
-			path = "/" + strings.Join(parts, "/")
-		} else if len(parts) == 1 && parts[0] != "" {
-			// Single part - could be bucket name or object key
-			path = "/" + parts[0]
-		} else {
-			path = "/"
-		}
-		
-		if prefix != "" {
-			path = "/" + prefix + path
-		}
+		key := extractKeyFromPath(r.URL.Path, bucketName)
 
-		// Normalize path: remove leading slash for S3 key (S3 keys don't start with /)
-		key := path
-		if len(key) > 0 && key[0] == '/' {
-			key = key[1:]
+		// Apply prefix if configured
+		if prefix != "" {
+			if key != "" {
+				key = prefix + "/" + key
+			} else {
+				key = prefix
+			}
 		}
 
 		// Regular operations
@@ -187,12 +168,16 @@ func NewProxyHandler(proxy S3Proxy, prefix string, bucketName string) http.Handl
 }
 
 func handleGet(proxy S3Proxy, key string, w http.ResponseWriter, r *http.Request) {
-	obj, err := proxy.Get(key)
+	// Get Range header for partial content requests
+	rangeHeader := r.Header.Get("Range")
+
+	obj, err := proxy.Get(key, rangeHeader)
 	if err != nil {
 		handleS3Error(w, err)
 		return
 	}
 
+	// Set headers BEFORE WriteHeader
 	setHeader(w, "Cache-Control", s2s(obj.CacheControl))
 	setHeader(w, "Content-Disposition", s2s(obj.ContentDisposition))
 	setHeader(w, "Content-Encoding", s2s(obj.ContentEncoding))
@@ -203,6 +188,13 @@ func handleGet(proxy S3Proxy, key string, w http.ResponseWriter, r *http.Request
 	setHeader(w, "ETag", s2s(obj.ETag))
 	setHeader(w, "Expires", s2s(obj.Expires))
 	setHeader(w, "Last-Modified", t2s(obj.LastModified))
+
+	// If Range was requested and we got partial content, return 206
+	if rangeHeader != "" && obj.ContentRange != nil {
+		w.WriteHeader(http.StatusPartialContent)
+	} else {
+		w.WriteHeader(http.StatusOK)
+	}
 
 	if r.Method == http.MethodHead {
 		return
@@ -243,8 +235,8 @@ func handlePut(proxy S3Proxy, key string, w http.ResponseWriter, r *http.Request
 	w.WriteHeader(http.StatusOK)
 }
 
-func handleCreateMultipartUpload(proxy S3Proxy, r *http.Request, w http.ResponseWriter) {
-	key := extractKeyFromPath(r.URL.Path)
+func handleCreateMultipartUpload(proxy S3Proxy, r *http.Request, w http.ResponseWriter, bucketName string) {
+	key := extractKeyFromPath(r.URL.Path, bucketName)
 	contentType := r.Header.Get("Content-Type")
 	if contentType == "" {
 		contentType = "application/octet-stream"
@@ -284,8 +276,8 @@ func handleCreateMultipartUpload(proxy S3Proxy, r *http.Request, w http.Response
 	}
 }
 
-func handleUploadPart(proxy S3Proxy, r *http.Request, w http.ResponseWriter) {
-	key := extractKeyFromPath(r.URL.Path)
+func handleUploadPart(proxy S3Proxy, r *http.Request, w http.ResponseWriter, bucketName string) {
+	key := extractKeyFromPath(r.URL.Path, bucketName)
 	uploadId := r.URL.Query().Get("uploadId")
 	partNumberStr := r.URL.Query().Get("partNumber")
 
@@ -314,8 +306,8 @@ func handleUploadPart(proxy S3Proxy, r *http.Request, w http.ResponseWriter) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func handleCompleteMultipartUpload(proxy S3Proxy, r *http.Request, w http.ResponseWriter) {
-	key := extractKeyFromPath(r.URL.Path)
+func handleCompleteMultipartUpload(proxy S3Proxy, r *http.Request, w http.ResponseWriter, bucketName string) {
+	key := extractKeyFromPath(r.URL.Path, bucketName)
 	uploadId := r.URL.Query().Get("uploadId")
 
 	// Parse the CompleteMultipartUpload XML from request body
@@ -384,8 +376,8 @@ func handleCompleteMultipartUpload(proxy S3Proxy, r *http.Request, w http.Respon
 	}
 }
 
-func handleAbortMultipartUpload(proxy S3Proxy, r *http.Request, w http.ResponseWriter) {
-	key := extractKeyFromPath(r.URL.Path)
+func handleAbortMultipartUpload(proxy S3Proxy, r *http.Request, w http.ResponseWriter, bucketName string) {
+	key := extractKeyFromPath(r.URL.Path, bucketName)
 	uploadId := r.URL.Query().Get("uploadId")
 
 	_, err := proxy.AbortMultipartUpload(key, uploadId)
@@ -471,17 +463,21 @@ func handleListMultipartUploads(proxy S3Proxy, r *http.Request, w http.ResponseW
 	}
 }
 
-func extractKeyFromPath(path string) string {
+func extractKeyFromPath(path string, bucketName string) string {
 	// Remove leading slash
 	key := strings.Trim(path, "/")
-	
+
 	// Handle bucket name in path
 	parts := strings.Split(key, "/")
-	if len(parts) > 1 {
-		// Assume first part might be bucket name
-		key = strings.Join(parts[1:], "/")
+	if len(parts) > 0 && parts[0] == bucketName {
+		// First part is the bucket name, remove it
+		if len(parts) > 1 {
+			key = strings.Join(parts[1:], "/")
+		} else {
+			key = ""
+		}
 	}
-	
+
 	return key
 }
 
@@ -586,18 +582,18 @@ func handleList(proxy S3Proxy, r *http.Request, w http.ResponseWriter, bucketNam
 	}
 
 	type ListBucketResult struct {
-		XMLName            xml.Name       `xml:"ListBucketResult"`
-		Xmlns              string         `xml:"xmlns,attr"`
-		Name               string         `xml:"Name"`
-		Prefix             string         `xml:"Prefix,omitempty"`
-		StartAfter         string         `xml:"StartAfter,omitempty"`
-		MaxKeys            int64          `xml:"MaxKeys"`
-		Delimiter          string         `xml:"Delimiter,omitempty"`
-		IsTruncated        bool           `xml:"IsTruncated"`
-		NextContinuationToken string      `xml:"NextContinuationToken,omitempty"`
-		ContinuationToken  string         `xml:"ContinuationToken,omitempty"`
-		Contents           []ListEntry    `xml:"Contents,omitempty"`
-		CommonPrefixes     []CommonPrefix `xml:"CommonPrefixes,omitempty"`
+		XMLName               xml.Name       `xml:"ListBucketResult"`
+		Xmlns                 string         `xml:"xmlns,attr"`
+		Name                  string         `xml:"Name"`
+		Prefix                string         `xml:"Prefix,omitempty"`
+		StartAfter            string         `xml:"StartAfter,omitempty"`
+		MaxKeys               int64          `xml:"MaxKeys"`
+		Delimiter             string         `xml:"Delimiter,omitempty"`
+		IsTruncated           bool           `xml:"IsTruncated"`
+		NextContinuationToken string         `xml:"NextContinuationToken,omitempty"`
+		ContinuationToken     string         `xml:"ContinuationToken,omitempty"`
+		Contents              []ListEntry    `xml:"Contents,omitempty"`
+		CommonPrefixes        []CommonPrefix `xml:"CommonPrefixes,omitempty"`
 	}
 
 	response := ListBucketResult{

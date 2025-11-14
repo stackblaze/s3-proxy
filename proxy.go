@@ -12,7 +12,7 @@ import (
 )
 
 type S3Proxy interface {
-	Get(key string) (*s3.GetObjectOutput, error)
+	Get(key string, rangeHeader string) (*s3.GetObjectOutput, error)
 	Put(key string, body io.ReadSeeker, contentType string) (*s3.PutObjectOutput, error)
 	Head(key string) (*s3.HeadObjectOutput, error)
 	ListObjects(prefix string, delimiter string, maxKeys int64, continuationToken string) (*s3.ListObjectsV2Output, error)
@@ -83,10 +83,15 @@ func normalizeWasabiEndpoint(endpoint, region string) string {
 	return endpoint
 }
 
-func (p *RealS3Proxy) Get(key string) (*s3.GetObjectOutput, error) {
+func (p *RealS3Proxy) Get(key string, rangeHeader string) (*s3.GetObjectOutput, error) {
 	req := &s3.GetObjectInput{
 		Bucket: aws.String(p.bucket),
 		Key:    aws.String(key),
+	}
+	
+	// Support HTTP Range requests
+	if rangeHeader != "" {
+		req.Range = aws.String(rangeHeader)
 	}
 
 	return p.s3.GetObject(req)
