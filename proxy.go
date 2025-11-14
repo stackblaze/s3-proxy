@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"strings"
 
@@ -39,6 +40,12 @@ func NewS3Proxy(key, secret, region, bucket, endpoint string) S3Proxy {
 		// Wasabi requires region-specific endpoints (e.g., s3.us-east-1.wasabisys.com)
 		// If a generic endpoint is provided, convert it to region-specific format
 		normalizedEndpoint := normalizeWasabiEndpoint(endpoint, region)
+		
+		// Debug logging to verify endpoint normalization
+		if endpoint != normalizedEndpoint {
+			fmt.Printf("Endpoint normalized: %s -> %s (region: %s)\n", endpoint, normalizedEndpoint, region)
+		}
+		
 		cfg.Endpoint = aws.String(normalizedEndpoint)
 		cfg.S3ForcePathStyle = aws.Bool(true) // Required for custom endpoints
 	}
