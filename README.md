@@ -34,7 +34,7 @@ Or download from [releases](https://github.com/stackblaze/s3-proxy/releases).
 curl -sSfL https://raw.githubusercontent.com/stackblaze/s3-proxy/main/scripts/install.sh | sh
 ```
 
-The script will replace your existing binary with the latest version. See [UPGRADE.md](UPGRADE.md) for detailed upgrade instructions.
+The script will replace your existing binary with the latest version.
 
 ### Local Build
 

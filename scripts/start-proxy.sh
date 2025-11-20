@@ -7,6 +7,8 @@ export S3PROXY_AWS_SECRET="HeCjI9zsWe6lemh42fmCCugfyF06f7zXlyb9VY0G"
 export S3PROXY_AWS_REGION="us-east-1"
 export S3PROXY_AWS_BUCKET="sd-fs-proxy"
 export S3PROXY_AWS_ENDPOINT="https://s3.wasabisys.com"
+# Note: The proxy will automatically convert this to s3.us-east-1.wasabisys.com
+# Wasabi requires region-specific endpoints for proper signature calculation
 
 echo "Starting s3-proxy with configuration:"
 echo "  Bucket: $S3PROXY_AWS_BUCKET"
