@@ -1,7 +1,5 @@
 # S3 Proxy
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
 A lightweight S3-compatible proxy optimized for ZeroFS. Supports Range requests, DELETE operations, and conditional writes.
 
 ## Quick Start
@@ -26,66 +24,18 @@ curl -sSfL https://raw.githubusercontent.com/stackblaze/s3-proxy/main/scripts/in
 
 Or download from [releases](https://github.com/stackblaze/s3-proxy/releases).
 
-### Upgrade
-
-**Easiest way:** Just run the install script again - it will automatically download and install the latest version:
-
-```bash
-curl -sSfL https://raw.githubusercontent.com/stackblaze/s3-proxy/main/scripts/install.sh | sh
-```
-
-The script will replace your existing binary with the latest version.
-
-### Local Build
-
-```bash
-git clone https://github.com/stackblaze/s3-proxy.git && cd s3-proxy
-go build -o s3-proxy && ./s3-proxy -port 8080
-```
-
 ## Configuration
 
-### Single Mode
-
-Environment variables:
+**Environment variables:**
 - `S3PROXY_AWS_KEY` (required)
 - `S3PROXY_AWS_SECRET` (required)
 - `S3PROXY_AWS_REGION` (default: us-east-1)
 - `S3PROXY_AWS_BUCKET` (required)
 - `S3PROXY_AWS_ENDPOINT` (optional)
 
-### Multi Mode
+**Multi-bucket mode:** Set `S3PROXY_CONFIG` as YAML or JSON array. See `examples/` for configuration templates.
 
-Set `S3PROXY_CONFIG` as YAML or JSON array:
-
-```yaml
-- host: wasabi.localhost
-  awsKey: key
-  awsSecret: secret
-  awsRegion: us-east-1
-  awsBucket: bucket
-  awsEndpoint: https://s3.wasabisys.com
-```
-
-### Hot-Reload
-
-Use `-config-file` for real-time updates without restart:
-
-```bash
-./s3-proxy -config-file config.yaml -port 8080
-```
-
-Configuration reloads automatically on file changes (~100ms).
-
-## ZeroFS
-
-```toml
-[aws]
-access_key_id = "your-key"
-secret_access_key = "your-secret"
-endpoint = "http://localhost:8080"
-allow_http = "true"
-```
+**Hot-reload:** Use `-config-file` flag for real-time configuration updates without restart.
 
 ## Features
 
@@ -93,13 +43,6 @@ allow_http = "true"
 - Multi-bucket/backend support
 - YAML config with hot-reload
 - Optimized for ZeroFS
-
-## Testing
-
-```bash
-go test ./...        # Run all tests
-make test           # Using Makefile
-```
 
 ## License
 
